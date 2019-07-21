@@ -1,0 +1,533 @@
+doctype html
+head
+  title #{title}
+  link(rel='stylesheet' href='/static/css/bulma.min.css')
+  script(src="/static/js/vue.js")
+body
+  header
+    nav(id='account-manage' class='navbar')
+      div(class='navbar-brand')
+        a(class='navbar-item' href='/vendor') BeautyShop - 供货商后台系统
+      div(class='navbar-menu')
+        div(class='navbar-end')
+          a(class='navbar-item') ID：{{ vendor['vendor_id'] }}
+          a(class='navbar-item', href='/vendor/logout') 注销
+  main
+  section(class='hero is-info')
+    div(class='hero-body')
+      div(class='container')
+        h2(class='title') 订单管理
+  section(id='order-manage' class='section')
+    div(class='container')
+      table(class='table is-bordered is-hoverable is-fullwidth')
+        thead
+          tr
+            th 订单号
+            th 用户ID
+            th 订单状态
+            th 物品
+            th 总价
+            th 配送编号
+            th 操作
+        tbody
+          tr(v-for='order in orderList')
+            td {{ order.order_id }}
+            td {{ order.user_id }}
+            td(v-if='order.order_deliver_status == 0') 待发货
+            td(v-else-if='order.order_deliver_status == 1') 已发货
+            td {{ order.order_item }}
+            td {{ order.order_total_price }}
+            td {{ order.order_deliver_number }}
+            td
+              button(v-if='order.order_deliver_status == 0' @click="showModal('addNewDeliver', order.order_id)" class='button') 填写物流信息
+              button(v-else class='button' @click="showModal('updateDeliver', order.order_id)") 修改物流信息
+    
+    // 填写物流信息模块、更新物流信息模块共用一个组件
+    div(id='modal_init-deliver-number' class='modal' :class="isModalOpen ? 'is-active' : ''")
+      div(class='modal-background')
+      div(class='modal-card')
+        header(class='modal-card-header')
+        section(class='modal-card-body')
+          div(class='field')
+            label(class='label') 物流公司
+            div(class='control')
+              div(class='select')
+                select(v-model='updateOrder.deliver_id')
+                  option(v-for='deliver in deliverList' :value='deliver.deliver_id') {{ deliver.deliver_name }}
+          div(class='field')
+            div(class='control')
+              label(class='label') 物流编号
+              input(class='input' type="text" v-model='updateOrder.order_deliver_number')
+          div(class='buttons')
+            button(@click='doSubmit' class='button is-info') {{ modalConfirmText }}
+            button(@click='doCancel' class='button') 取消
+        footer(class='modal-card-footer')
+
+  section(class='hero is-primary')
+    div(class='hero-body')
+      div(class='container')
+        h2(class='title') 商品管理
+  section(id='commodity-manage' class='section')
+    div(class='container')
+      div(class='buttons')
+        button(@click='showAddCommodityModal' class='button is-info is-rounded') 添加商品
+      table(class='table is-bordered is-fullwidth is-hoverable')
+        thead
+          tr
+            th 编号
+            th 名称
+            th 价格
+            th 库存
+            th 已售
+            th 状态
+            th 创建时间
+            th 操作
+        tbody
+          tr(v-for='commodity in commodityList' class='commodity-record')
+            td {{ commodity.commodity_id }}
+            td {{ commodity.commodity_name }}
+            td {{ commodity.commodity_price }}
+            td {{ commodity.commodity_stock }}
+            td {{ commodity.commodity_sold }}
+            td {{ commodity.commodity_status == 0 ? '在售' : '已下架'}}
+            td {{ commodity.commodity_create_date }}
+            td
+              div(class='field has-addons')
+                div(class='control')
+                  button(@click="showCommonModal('updatePrice', commodity.commodity_id)" class='button show-modal_update-price') 调整价格
+                div(class='control')
+                  button(@click="showCommonModal('updateStock', commodity.commodity_id)" class='button update-stock') 更新库存
+                div(class='control')
+                  button(@click='showUpdateDetailModal(commodity.commodity_id)' class='button update-detail') 修改详情
+                div(class='control')
+                  button(@click='showDeleteModal(commodity.commodity_id)' class='button delete-commodity') 删除
+    
+    // 更新价格模块、更新库存模块共用一个组件
+    div(id='modal_update-price' class='modal' :class="isCommonModalOpen ? 'is-active' : ''")
+      div(class='modal-background')
+      div(class='modal-card')
+        header(class='modal-card-header')
+        section(class='modal-card-body')
+          div(class='field')
+            div(class='control')
+              label(class='label') {{ commonModalLabelText }}
+              input(class='input' type="number" v-model='commonModalValue')
+          div(class='buttons')
+            button(@click='doCommonSubmit' class='button is-info') {{ commonModalConfirmText }}
+            button(@click='doCommonCancel' class='button') 取消
+
+    // 删除商品模块
+    div(id='modal_delete' class='modal' :class="isDelete ? 'is-active' : ''")
+      div(class='modal-background')
+      div(class='modal-card')
+        header(class='modal-card-head')
+          p(class='modal-card-title') 你确定删除该商品？
+        section(class='modal-card-body')
+          div(class='buttons')
+            button(@click='doDelete' class='button is-danger') 确认删除
+            button(@click='doCancelDelete' class='button') 取消
+    
+    // 更新商品详情模块
+    div(id='modal_update-detail' class='modal' :class="isUpdateDetail ? 'is-active' : ''")
+      div(class='modal-background')
+      div(class='modal-card')
+        header(class='modal-card-head')
+          p(class='modal-card-title') 更新商品详情
+        section(class='modal-card-body')
+          div(class='field')
+            label(class='label') 名称
+            div(class='control')
+              input(class='input' type="text" v-model='updateCommodity.commodity_name')
+          div(class='field')
+            label(class='label') 封面地址
+            div(class='control')
+              input(class='input' type="text" v-model='updateCommodity.commodity_cover')
+          div(class='field')
+            label(class='label') 细节描述
+            div(class='control')
+              textarea(class='textarea' v-model='updateCommodity.commodity_detail')
+        footer(class='modal-card-foot')
+          div(class='buttons')
+            button(@click='doUpdateDetail' class='button is-danger') 保存更改
+            button(@click='doCancelUpdateDetail' class='button') 取消
+
+    // 添加新商品组件
+    div(id='modal_add-commodity' class='modal' :class="isAddCommodityModalOpen ? 'is-active' : ''")
+      div(class='modal-background')
+      div(class='modal-card')
+        header(class='modal-card-head')
+          p 添加新商品
+        div(class='modal-card-body')
+          div(class='field')
+            label(class='label') 名称
+            div(class='control')
+              input(class='input' type="text" v-model='newCommodity.commodity_name')
+          div(class='field')
+            label(class='label') 封面
+            div(class='control')
+              input(class='input' type="text" v-model='newCommodity.commodity_cover')
+          div(class='field')
+            label(class='label') 详情
+            div(class='control')
+              textarea(class='textarea' v-model='newCommodity.commodity_detail')
+          div(class='field')
+            label(class='label') 价格
+            div(class='control')
+              input(class='input' type="number" v-model='newCommodity.commodity_price')
+          div(class='field')
+            label(class='label') 库存
+            div(class='control')
+              input(class='input' type="number" v-model='newCommodity.commodity_stock')
+          div(class='field')
+            label(class='label') 状态
+            div(class='control')
+              div(class='select')
+                select(v-model='newCommodity.commodity_status')
+                  option(value='0') 在售
+                  option(value='1') 停售
+          div(class='field')
+            div(class='buttons')
+              button(@click='doSubmitAddCommodity' class='button is-success') 提交
+              button(@click='doCancelAddCommodity' class='button') 取消
+
+script.
+  // 账户管理实例
+  var am = new Vue({
+    el: '#account-manage',
+    data: {
+      vendor: {}
+    },
+    methods: {
+
+    }
+  })
+
+  // 订单管理实例
+  var om = new Vue({
+    el: '#order-manage',
+    data: {
+      isModalOpen: false,
+      currentAction: '',
+      modalConfirmText: '',
+      updateOrder: {
+        order_id: 0,
+        deliver_id: 0,
+        order_deliver_status: 0,
+        order_deliver_number: null
+      },      
+      orderList: [],
+      deliverList: []
+    },
+    methods: {
+      showModal: (action, order_id) => {
+        getDeliver()
+        om.currentAction = action
+        om.updateOrder.order_id = order_id
+
+        if (action == 'addNewDeliver') {
+          om.modalConfirmText = '提交'
+        }
+        else if(action == 'updateDeliver'){
+          om.modalConfirmText = '更新'
+          for (let i = 0; i < om.orderList.length; ++i) {
+            if (om.orderList[i].order_id == om.updateOrder.order_id) {
+              console.log(om.orderList[i].deliver_id)
+              om.updateOrder.deliver_id = om.orderList[i].deliver_id
+              om.updateOrder.order_deliver_number = om.orderList[i].order_deliver_number
+            }
+          }       
+        }
+
+        om.isModalOpen = true
+      },
+      doSubmit: () => {
+        let order = {
+          order_id: om.updateOrder.order_id,
+          deliver_id: om.updateOrder.deliver_id,
+          order_deliver_number: om.updateOrder.order_deliver_number,
+          order_deliver_status: 1
+        }
+
+        if (om.currentAction == 'addNewDeliver')
+          order['order_delvier_status'] = 1
+
+        let options = {
+          method: 'POST',
+          url: '/order/updateDeliver',
+          header: {
+            'Content-Type': 'application/json'
+          },
+          data: {
+            order: order
+          },
+          success: (res) => {
+            om.isModalOpen = false
+            getOrderList()
+          }
+        }
+        request(options)        
+      },
+      doCancel: () => {
+        om.isModalOpen = false
+      }
+    }
+  })
+
+  var getDeliver = function () {
+    let options = {
+      method: 'GET',
+      url: '/deliver',
+      json: true,
+      success: (res) => {
+        om.deliverList = res
+      }
+    }
+    request(options)
+  }
+
+  // 商品管理实例
+  var cm = new Vue({
+    el: '#commodity-manage',
+    data: {
+      isCommonModalOpen: false,
+      commonModalLabelText: '',
+      commonModalConfirmText: '',
+      commonModalValue: '',
+      commonModalCurrentAction: '',
+      updateCommodity: {
+        commodity_id: 0,
+        commodity_price: 0,
+        commodity_stock: 0,
+        commodity_detail: 0
+      },
+      commodityList: [],
+      isUpdateDetail: false,
+      isDelete: false,
+      isAddCommodityModalOpen: false,
+      newCommodity: {
+        commodity_name: '',
+        commodity_cover: '',
+        commodity_detail: '',
+        commodity_price: '',
+        commodity_stock: '',
+        commodity_status: ''
+      }
+    },
+    methods: {
+      showCommonModal: (action, commodity_id) => {
+        cm.updateCommodity['commodity_id'] = commodity_id
+        cm.commonModalConfirmText = '更新'
+        cm.commonModalCurrentAction = action
+
+        if (action == 'updatePrice') {
+          cm.commonModalLabelText = '更改价格'
+          for (let i = 0; i < cm.commodityList.length; ++i) {
+            if (cm.commodityList[i].commodity_id == cm.updateCommodity.commodity_id) {
+              cm.commonModalValue = cm.commodityList[i].commodity_price
+              break
+            }
+          }
+        }
+        else if (action == 'updateStock') {
+          cm.commonModalLabelText = '更改库存'
+          for (let i = 0; i < cm.commodityList.length; ++i) {
+            if (cm.commodityList[i].commodity_id == cm.updateCommodity.commodity_id) {
+              cm.commonModalValue = cm.commodityList[i].commodity_stock
+              break
+            }
+          }          
+        }
+
+        cm.isCommonModalOpen = true
+      },
+      doCommonSubmit: () => {
+        let url;
+        let commodity;
+        if (cm.commonModalCurrentAction == 'updatePrice') {
+          url = '/commodity/updatePrice'
+          commodity = {
+            commodity_id: cm.updateCommodity.commodity_id,
+            commodity_price: parseFloat(cm.commonModalValue)
+          }
+        }
+        else if (cm.commonModalCurrentAction == 'updateStock') {
+          url = '/commodity/updateStock'
+          commodity = {
+            commodity_id: cm.updateCommodity.commodity_id,
+            commodity_stock: parseInt(cm.commonModalValue)
+          }
+        }
+        let options = {
+          method: 'PATCH',
+          url: url,
+          header: {
+            'Content-Type': 'application/json'
+          },
+          data: {
+            commodity: commodity
+          },
+          success: function (res) {
+            getCommodityList()
+            cm.isCommonModalOpen = false
+          }
+        }
+        request(options)
+      },
+      doCommonCancel: () => {
+        cm.isCommonModalOpen = false
+      },
+      showDeleteModal: (commodity_id) => {
+        cm.updateCommodity['commodity_id'] = commodity_id
+        cm.isDelete = true
+      },
+      doDelete: () => {
+        let options = {
+          method: 'DELETE',
+          url: '/commodity/delete',
+          header: {
+            'Content-Type': 'application/json'
+          },
+          data: {
+            commodity: {
+              commodity_id: cm.updateCommodity.commodity_id,
+            }
+          },
+          success: (res) => {
+            getCommodityList()
+            cm.isDelete = false
+          }
+        }
+        request(options)
+      },
+      doCancelDelete: () => {
+        cm.isDelete = false
+      },
+      showUpdateDetailModal: (commodity_id) => {
+        cm.updateCommodity['commodity_id'] = commodity_id
+        for (let i = 0; i < cm.commodityList.length; ++i) {
+            if (cm.commodityList[i].commodity_id == cm.updateCommodity.commodity_id) {
+              cm.updateCommodity.commodity_name = cm.commodityList[i].commodity_name
+              cm.updateCommodity.commodity_cover = cm.commodityList[i].commodity_cover
+              cm.updateCommodity.commodity_detail = cm.commodityList[i].commodity_detail
+              break
+            }
+        }
+        cm.isUpdateDetail = true
+      },
+      doUpdateDetail: () => {
+        let options = {
+          method: 'PATCH',
+          url: '/commodity/updateDetail',
+          header: {
+            'Content-Type': 'application/json'
+          },
+          data: {
+            commodity: {
+              commodity_id: cm.updateCommodity.commodity_id,
+              commodity_name: cm.updateCommodity.commodity_name,
+              commodity_cover: cm.updateCommodity.commodity_cover,
+              commodity_detail: cm.updateCommodity.commodity_detail,
+            }
+          },
+          success: (res) => {
+            getCommodityList()
+            cm.isUpdateDetail = false
+          }
+        }
+        request(options)
+      },
+      doCancelUpdateDetail: () => {
+        cm.isUpdateDetail = false
+      },
+      showAddCommodityModal: () => {
+        cm.isAddCommodityModalOpen = true
+      },
+      doSubmitAddCommodity: () => {
+        let options = {
+          method: 'POST',
+          url: '/commodity/add',
+          data: {
+            commodity: 
+          },
+          success: (res) => {
+            
+          } 
+        }
+        console.log(JSON.stringify(cm.newCommodity))
+      },
+      doCancelAddCommodity: () => {
+        cm.isAddCommodityModalOpen = false
+      }
+    }
+  })
+  initData()
+  function initData() {
+    getUserInfo()
+    getOrderList()
+    getCommodityList()
+  }
+  function getUserInfo() {
+    let options = {
+      method: 'get',
+      url: '/vendor/profile',
+      success: (res) => {
+        console.log(typeof res)
+        am.vendor = res
+      },
+      json: true
+    }
+    request(options)
+  }
+  function getOrderList() {
+    let options = {
+      method: 'get',
+      url: '/vendor/order',
+      success: (res) => {
+        om.orderList = res
+      },
+      json: true
+    }
+    request(options)
+  }
+  function getCommodityList() {
+    let options = {
+      method: 'get',
+      url: '/vendor/commodity',
+      success: (res) => {
+        cm.commodityList = res
+      },
+      json: true
+    }
+    request(options)
+  }
+
+  function request(options) {
+    let req = new XMLHttpRequest()
+
+    req.open(options.method, options.url)
+
+    for (let headerName in options.header) {
+      req.setRequestHeader(headerName, options.header[headerName])
+    }
+
+    if (options.json)
+      req.responseType = 'json'
+
+    if (typeof options.success == 'function')
+      req.onload = function () {
+        if (req.status = 200) 
+          options.success(req.response)
+      }
+    
+    if (options.data != null && !isEmpty(options.data))
+      req.send(JSON.stringify(options.data))
+    else
+      req.send()
+  }
+  function isEmpty(obj) {
+    let count = 0
+    for (let key in obj) {
+      return false
+    }
+    return true
+  }
